@@ -1,0 +1,133 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model (connected to Clerk)
+model User {
+  id         String   @id @default(cuid())
+  clerk_id   String   @unique
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  portfolioItems PortfolioItem[]
+  watchlistItems WatchlistItem[]
+  activities     Activity[]
+
+  @@index([clerk_id])
+}
+
+// Asset model (stocks and cryptocurrencies)
+model Asset {
+  id     String @id @default(cuid())
+  symbol String @unique
+  name   String
+  type   AssetType
+  meta   Json?
+
+  // Relations
+  portfolioItems PortfolioItem[]
+  watchlistItems WatchlistItem[]
+  activities     Activity[]
+
+  @@index([symbol])
+}
+
+// Portfolio items
+model PortfolioItem {
+  id        String   @id @default(cuid())
+  quantity  Float
+  buy_price Float
+  buy_date  DateTime
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  user      User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id   String
+  asset     Asset  @relation(fields: [asset_id], references: [id], onDelete: Cascade)
+  asset_id  String
+
+  @@unique([user_id, asset_id])
+  @@index([user_id])
+  @@index([asset_id])
+}
+
+// Watchlist items
+model WatchlistItem {
+  id         String   @id @default(cuid())
+  created_at DateTime @default(now())
+
+  // Relations
+  user      User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id   String
+  asset     Asset  @relation(fields: [asset_id], references: [id], onDelete: Cascade)
+  asset_id  String
+
+  @@unique([user_id, asset_id])
+  @@index([user_id])
+}
+
+// User activities
+model Activity {
+  id         String       @id @default(cuid())
+  type       ActivityType
+  amount     Float?
+  quantity   Float?
+  created_at DateTime     @default(now())
+  
+  // Relations
+  user      User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id   String
+  asset     Asset  @relation(fields: [asset_id], references: [id], onDelete: Cascade)
+  asset_id  String
+
+  @@index([user_id])
+  @@index([created_at])
+}
+
+// Admin activities (for auditing)
+model AdminActivity {
+  id          String           @id @default(cuid())
+  admin_id    String
+  action_type AdminActionType
+  details     Json?
+  created_at  DateTime         @default(now())
+
+  @@index([admin_id])
+  @@index([created_at])
+}
+
+// Enums
+enum AssetType {
+  STOCK
+  CRYPTO
+}
+
+enum ActivityType {
+  BUY
+  SELL
+  DEPOSIT
+  WITHDRAW
+  DIVIDEND
+  INTEREST
+}
+
+enum AdminActionType {
+  USER_MANAGEMENT
+  ASSET_MANAGEMENT
+  SYSTEM_CONFIG
+  DATA_EXPORT
+  OTHER
+}
