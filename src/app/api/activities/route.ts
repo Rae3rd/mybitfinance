@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { currentUser } from '@clerk/nextjs/server';
+import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
 import { formatDistanceToNow } from 'date-fns';
 import { Prisma } from '@prisma/client';
@@ -15,15 +15,15 @@ type FormattedActivity = {
 
 export async function GET() {
   try {
-    const user = await currentUser();
+    const { userId } = await auth();
     
-    if (!user) {
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Find the user in our database by Clerk ID
     const dbUser = await prisma.user.findUnique({
-      where: { clerk_id: user.id },
+      where: { clerk_id: userId },
     });
 
     if (!dbUser) {

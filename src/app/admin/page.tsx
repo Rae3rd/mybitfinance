@@ -14,6 +14,8 @@ import {
   ClockIcon
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
+import { useDashboardMetrics } from '@/lib/hooks/useAdminData';
+import { toast } from 'sonner';
 
 export default function AdminDashboard() {
   const { user } = useUser();
@@ -48,40 +50,47 @@ export default function AdminDashboard() {
     threshold: 0.1,
   });
 
-  // Mock data for dashboard
-  const dashboardData = {
-    activeUsers: 1243,
-    activeUsersChange: 12.5,
-    newRegistrations: 87,
-    newRegistrationsChange: 23.4,
-    pendingTransactions: 34,
-    pendingTransactionsChange: -5.2,
-    openTickets: 12,
-    openTicketsChange: 8.7,
+  // Fetch dashboard metrics
+  const { data: dashboardData, isLoading, error } = useDashboardMetrics();
+
+  // Handle error state
+  if (error) {
+    toast.error('Failed to load dashboard metrics');
+  }
+
+  // Loading state fallback data
+  const fallbackData = {
+    activeUsers: 0,
+    activeUsersChange: 0,
+    newRegistrations: 0,
+    newRegistrationsChange: 0,
+    pendingTransactions: 0,
+    pendingTransactionsChange: 0,
+    openTickets: 0,
+    openTicketsChange: 0,
     systemHealth: {
-      api: 'healthy',
-      database: 'healthy',
-      jobs: 'warning'
+      api: 'unknown',
+      database: 'unknown',
+      jobs: 'unknown'
     },
     revenue: {
-      today: 12450.75,
-      todayChange: 15.3,
-      volume: 1245000.50
+      today: 0,
+      todayChange: 0,
+      volume: 0
     },
-    criticalAlerts: [
-      'Payment gateway latency detected (3.2s response time)',
-      'Unusual withdrawal pattern detected for user ID: 8721',
-      'System update scheduled for 02:00 UTC'
-    ]
+    criticalAlerts: []
   };
 
+  const metrics = dashboardData || fallbackData;
+
   // Metric card component
-  const MetricCard = ({ title, value, change, icon: Icon, link }: { 
+  const MetricCard = ({ title, value, change, icon: Icon, link, isLoading }: { 
     title: string, 
     value: string | number, 
     change: number, 
     icon: any,
-    link: string 
+    link: string,
+    isLoading?: boolean
   }) => (
     <motion.div 
       className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden"
@@ -93,20 +102,26 @@ export default function AdminDashboard() {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-medium text-gray-500">{title}</p>
-            <p className="text-2xl font-bold mt-1">{value}</p>
+            {isLoading ? (
+              <div className="h-8 bg-gray-200 rounded animate-pulse mt-1"></div>
+            ) : (
+              <p className="text-2xl font-bold mt-1">{value}</p>
+            )}
             <div className="flex items-center mt-2">
-              {change > 0 ? (
+              {!isLoading && change > 0 ? (
                 <>
                   <ArrowUpIcon className="w-4 h-4 text-emerald-500 mr-1" />
                   <span className="text-sm font-medium text-emerald-500">{change}%</span>
                 </>
-              ) : (
+              ) : !isLoading && change < 0 ? (
                 <>
                   <ArrowDownIcon className="w-4 h-4 text-red-500 mr-1" />
                   <span className="text-sm font-medium text-red-500">{Math.abs(change)}%</span>
                 </>
+              ) : null}
+              {!isLoading && (
+                <span className="text-sm text-gray-500 ml-1">vs last week</span>
               )}
-              <span className="text-sm text-gray-500 ml-1">vs last week</span>
             </div>
           </div>
           <div className="bg-gray-50 p-3 rounded-lg">
@@ -135,7 +150,7 @@ export default function AdminDashboard() {
       </motion.div>
 
       {/* Real-time alerts banner */}
-      {dashboardData.criticalAlerts.length > 0 && (
+      {metrics.criticalAlerts.length > 0 && (
         <motion.div 
           className="mb-8 bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-lg overflow-hidden"
           initial={{ opacity: 0, x: -20 }}
@@ -147,7 +162,7 @@ export default function AdminDashboard() {
             <div>
               <h3 className="font-medium text-amber-800">Attention Required</h3>
               <div className="mt-1 text-sm text-amber-700 space-y-1">
-                {dashboardData.criticalAlerts.map((alert, index) => (
+                {metrics.criticalAlerts.map((alert, index) => (
                   <p key={index}>{alert}</p>
                 ))}
               </div>
@@ -166,31 +181,35 @@ export default function AdminDashboard() {
       >
         <MetricCard 
           title="Active Users" 
-          value={dashboardData.activeUsers.toLocaleString()} 
-          change={dashboardData.activeUsersChange} 
+          value={metrics.activeUsers.toLocaleString()} 
+          change={metrics.activeUsersChange} 
           icon={UsersIcon}
           link="/admin/users"
+          isLoading={isLoading}
         />
         <MetricCard 
           title="New Registrations (24h)" 
-          value={dashboardData.newRegistrations} 
-          change={dashboardData.newRegistrationsChange} 
+          value={metrics.newRegistrations} 
+          change={metrics.newRegistrationsChange} 
           icon={UsersIcon}
           link="/admin/users?filter=new"
+          isLoading={isLoading}
         />
         <MetricCard 
           title="Pending Transactions" 
-          value={dashboardData.pendingTransactions} 
-          change={dashboardData.pendingTransactionsChange} 
+          value={metrics.pendingTransactions} 
+          change={metrics.pendingTransactionsChange} 
           icon={CurrencyDollarIcon}
           link="/admin/transactions?status=pending"
+          isLoading={isLoading}
         />
         <MetricCard 
           title="Open Support Tickets" 
-          value={dashboardData.openTickets} 
-          change={dashboardData.openTicketsChange} 
+          value={metrics.openTickets} 
+          change={metrics.openTicketsChange} 
           icon={ChatBubbleLeftRightIcon}
           link="/admin/support"
+          isLoading={isLoading}
         />
       </motion.div>
 
@@ -217,21 +236,21 @@ export default function AdminDashboard() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <div className="flex items-center">
-                    <div className={`w-3 h-3 rounded-full mr-2 ${dashboardData.systemHealth.api === 'healthy' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                    <div className={`w-3 h-3 rounded-full mr-2 ${metrics.systemHealth.api === 'healthy' ? 'bg-green-500' : 'bg-red-500'}`}></div>
                     <h3 className="text-sm font-medium text-gray-700">API Status</h3>
                   </div>
                   <p className="mt-2 text-sm text-gray-500">Response time: 230ms</p>
                 </div>
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <div className="flex items-center">
-                    <div className={`w-3 h-3 rounded-full mr-2 ${dashboardData.systemHealth.database === 'healthy' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                    <div className={`w-3 h-3 rounded-full mr-2 ${metrics.systemHealth.database === 'healthy' ? 'bg-green-500' : 'bg-red-500'}`}></div>
                     <h3 className="text-sm font-medium text-gray-700">Database Status</h3>
                   </div>
                   <p className="mt-2 text-sm text-gray-500">Query time: 45ms</p>
                 </div>
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <div className="flex items-center">
-                    <div className={`w-3 h-3 rounded-full mr-2 ${dashboardData.systemHealth.jobs === 'healthy' ? 'bg-green-500' : dashboardData.systemHealth.jobs === 'warning' ? 'bg-amber-500' : 'bg-red-500'}`}></div>
+                    <div className={`w-3 h-3 rounded-full mr-2 ${metrics.systemHealth.jobs === 'healthy' ? 'bg-green-500' : metrics.systemHealth.jobs === 'warning' ? 'bg-amber-500' : 'bg-red-500'}`}></div>
                     <h3 className="text-sm font-medium text-gray-700">Cron Jobs</h3>
                   </div>
                   <p className="mt-2 text-sm text-gray-500">Last run: 15 minutes ago</p>
@@ -252,25 +271,35 @@ export default function AdminDashboard() {
                 <div>
                   <p className="text-sm font-medium text-gray-500">Today's Revenue</p>
                   <div className="flex items-center mt-2">
-                    <p className="text-2xl font-bold">${dashboardData.revenue.today.toLocaleString()}</p>
-                    <div className="ml-3 flex items-center">
-                      {dashboardData.revenue.todayChange > 0 ? (
-                        <>
-                          <ArrowUpIcon className="w-4 h-4 text-emerald-500 mr-1" />
-                          <span className="text-sm font-medium text-emerald-500">{dashboardData.revenue.todayChange}%</span>
-                        </>
-                      ) : (
-                        <>
-                          <ArrowDownIcon className="w-4 h-4 text-red-500 mr-1" />
-                          <span className="text-sm font-medium text-red-500">{Math.abs(dashboardData.revenue.todayChange)}%</span>
-                        </>
-                      )}
-                    </div>
+                    {isLoading ? (
+                      <div className="h-8 bg-gray-200 rounded animate-pulse"></div>
+                    ) : (
+                      <>
+                        <p className="text-2xl font-bold">${metrics.revenue.today.toLocaleString()}</p>
+                        <div className="ml-3 flex items-center">
+                          {metrics.revenue.todayChange > 0 ? (
+                            <>
+                              <ArrowUpIcon className="w-4 h-4 text-emerald-500 mr-1" />
+                              <span className="text-sm font-medium text-emerald-500">{metrics.revenue.todayChange}%</span>
+                            </>
+                          ) : (
+                            <>
+                              <ArrowDownIcon className="w-4 h-4 text-red-500 mr-1" />
+                              <span className="text-sm font-medium text-red-500">{Math.abs(metrics.revenue.todayChange)}%</span>
+                            </>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-500">Total Volume Processed</p>
-                  <p className="text-2xl font-bold mt-2">${dashboardData.revenue.volume.toLocaleString()}</p>
+                  {isLoading ? (
+                    <div className="h-8 bg-gray-200 rounded animate-pulse mt-2"></div>
+                  ) : (
+                    <p className="text-2xl font-bold mt-2">${metrics.revenue.volume.toLocaleString()}</p>
+                  )}
                 </div>
               </div>
               <div className="mt-6 h-64 bg-gray-50 rounded-lg flex items-center justify-center">
@@ -369,7 +398,7 @@ export default function AdminDashboard() {
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-semibold text-gray-900">Pending Approvals</h2>
                 <span className="bg-amber-100 text-amber-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
-                  {dashboardData.pendingTransactions} items
+                  {isLoading ? '...' : `${metrics.pendingTransactions} items`}
                 </span>
               </div>
               <div className="space-y-3">

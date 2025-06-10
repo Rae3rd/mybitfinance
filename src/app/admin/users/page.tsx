@@ -1,5 +1,6 @@
 'use client';
 
+import * as React from 'react';
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
@@ -14,106 +15,65 @@ import {
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
+import { useUsers } from '../../../lib/hooks/useAdminData';
+import { toast } from 'sonner';
+
+// Extended user interface for the component
+interface User {
+  id: string;
+  email: string;
+  name: string;
+  status: 'active' | 'inactive' | 'suspended';
+  kycStatus: string;
+  registrationDate: string;
+  lastLogin: string;
+  portfolioValue: number;
+}
+
+// Define the structure of the API response
+interface UsersResponse {
+  users: User[];
+  totalPages: number;
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
 
 export default function UsersManagement() {
   // State for search, filters, and pagination
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
-  const [isLoading, setIsLoading] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   
-  // Mock user data
-  const mockUsers = [
-    {
-      id: '1',
-      name: 'John Doe',
-      email: 'john.doe@example.com',
-      status: 'active',
-      kycStatus: 'verified',
-      registrationDate: '2023-05-15',
-      lastLogin: '2023-06-10T14:30:00',
-      portfolioValue: 12500.75,
-      country: 'United States'
-    },
-    {
-      id: '2',
-      name: 'Jane Smith',
-      email: 'jane.smith@example.com',
-      status: 'active',
-      kycStatus: 'pending',
-      registrationDate: '2023-05-20',
-      lastLogin: '2023-06-09T10:15:00',
-      portfolioValue: 8750.25,
-      country: 'Canada'
-    },
-    {
-      id: '3',
-      name: 'Robert Johnson',
-      email: 'robert.johnson@example.com',
-      status: 'inactive',
-      kycStatus: 'rejected',
-      registrationDate: '2023-04-10',
-      lastLogin: '2023-05-01T09:45:00',
-      portfolioValue: 0,
-      country: 'United Kingdom'
-    },
-    {
-      id: '4',
-      name: 'Emily Davis',
-      email: 'emily.davis@example.com',
-      status: 'active',
-      kycStatus: 'verified',
-      registrationDate: '2023-06-01',
-      lastLogin: '2023-06-10T16:20:00',
-      portfolioValue: 32150.50,
-      country: 'Australia'
-    },
-    {
-      id: '5',
-      name: 'Michael Wilson',
-      email: 'michael.wilson@example.com',
-      status: 'suspended',
-      kycStatus: 'verified',
-      registrationDate: '2023-03-15',
-      lastLogin: '2023-05-20T11:30:00',
-      portfolioValue: 5600.00,
-      country: 'Germany'
-    },
-    {
-      id: '6',
-      name: 'Sarah Brown',
-      email: 'sarah.brown@example.com',
-      status: 'active',
-      kycStatus: 'not_submitted',
-      registrationDate: '2023-06-05',
-      lastLogin: '2023-06-09T08:45:00',
-      portfolioValue: 1250.75,
-      country: 'France'
-    },
-    {
-      id: '7',
-      name: 'David Lee',
-      email: 'david.lee@example.com',
-      status: 'active',
-      kycStatus: 'verified',
-      registrationDate: '2023-05-10',
-      lastLogin: '2023-06-08T14:15:00',
-      portfolioValue: 18750.25,
-      country: 'Japan'
-    },
-    {
-      id: '8',
-      name: 'Lisa Taylor',
-      email: 'lisa.taylor@example.com',
-      status: 'inactive',
-      kycStatus: 'pending',
-      registrationDate: '2023-04-25',
-      lastLogin: '2023-05-15T10:30:00',
-      portfolioValue: 0,
-      country: 'Brazil'
-    },
-  ];
+  // Fetch users data
+  const { 
+    data: usersData, 
+    isLoading, 
+    error 
+  } = useUsers({
+    page: currentPage,
+    limit: 10,
+    search: searchQuery,
+    status: filterStatus === 'all' ? undefined : filterStatus
+  }) as { data: UsersResponse | undefined; isLoading: boolean; error: Error | null };
+  
+  // Handle API errors
+  if (error) {
+    toast.error('Failed to load users data');
+  }
+  
+  const users = usersData?.users || [];
+  const totalPages = usersData?.pagination?.totalPages || 1;
+  
+  // Fallback data for when API is loading
+  const fallbackUsers: User[] = [];
+  
+  // Use API data or fallback
+  const displayUsers = users.length > 0 ? users : fallbackUsers;
 
   // Animation variants
   const containerVariants = {
@@ -139,22 +99,9 @@ export default function UsersManagement() {
     }
   };
 
-  // Filter users based on search query and filter status
-  const filteredUsers = mockUsers.filter(user => {
-    const matchesSearch = 
-      user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.id.includes(searchQuery);
-    
-    const matchesFilter = 
-      filterStatus === 'all' ||
-      user.status === filterStatus ||
-      user.kycStatus === filterStatus;
-    
-    return matchesSearch && matchesFilter;
-  });
+  // Filtering is now handled by the API through the useUsers hook parameters
 
-  // Handle search input change
+  // Handle search input change with debounce
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
     setCurrentPage(1); // Reset to first page on new search
@@ -166,12 +113,12 @@ export default function UsersManagement() {
     setCurrentPage(1); // Reset to first page on new filter
   };
 
-  // Simulate loading data
+  // Refresh data by refetching from API
   const refreshData = () => {
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-    }, 800);
+    // The useUsers hook will automatically refetch when dependencies change
+    // We can force a refetch by changing the currentPage and then changing it back
+    setCurrentPage(prev => prev + 1);
+    setTimeout(() => setCurrentPage(prev => prev - 1), 10);
   };
 
   // Get status badge styling
@@ -389,8 +336,46 @@ export default function UsersManagement() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredUsers.length > 0 ? (
-                filteredUsers.map((user) => (
+              {isLoading ? (
+                // Loading skeleton rows
+                Array.from({ length: 5 }).map((_, index) => (
+                  <tr key={`skeleton-${index}`}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 h-10 w-10 bg-gray-200 rounded-full animate-pulse"></div>
+                        <div className="ml-4 space-y-2">
+                          <div className="h-4 bg-gray-200 rounded animate-pulse w-32"></div>
+                          <div className="h-3 bg-gray-200 rounded animate-pulse w-48"></div>
+                          <div className="h-3 bg-gray-200 rounded animate-pulse w-16"></div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="h-6 bg-gray-200 rounded-full animate-pulse w-16"></div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="h-6 bg-gray-200 rounded-full animate-pulse w-20"></div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="h-4 bg-gray-200 rounded animate-pulse w-24"></div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="h-4 bg-gray-200 rounded animate-pulse w-20"></div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="h-4 bg-gray-200 rounded animate-pulse w-24"></div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <div className="flex justify-end space-x-2">
+                        <div className="h-8 w-8 bg-gray-200 rounded-full animate-pulse"></div>
+                        <div className="h-8 w-8 bg-gray-200 rounded-full animate-pulse"></div>
+                        <div className="h-8 w-8 bg-gray-200 rounded-full animate-pulse"></div>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : displayUsers.length > 0 ? (
+                displayUsers.map((user: User) => (
                   <motion.tr 
                     key={user.id}
                     variants={itemVariants}
@@ -399,7 +384,7 @@ export default function UsersManagement() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="flex-shrink-0 h-10 w-10 bg-gradient-to-br from-navy-500 to-emerald-500 rounded-full flex items-center justify-center text-white font-medium">
-                          {user.name.split(' ').map(n => n[0]).join('')}
+                          {user.name.split(' ').map((n: string) => n[0]).join('')}
                         </div>
                         <div className="ml-4">
                           <div className="text-sm font-medium text-gray-900">{user.name}</div>
@@ -474,14 +459,19 @@ export default function UsersManagement() {
           <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
             <div>
               <p className="text-sm text-gray-700">
-                Showing <span className="font-medium">1</span> to <span className="font-medium">{filteredUsers.length}</span> of{' '}
-                <span className="font-medium">{filteredUsers.length}</span> results
+                Showing <span className="font-medium">{(currentPage - 1) * 10 + 1}</span> to <span className="font-medium">{Math.min(currentPage * 10, usersData?.pagination?.total || 0)}</span> of{' '}
+                <span className="font-medium">{usersData?.pagination?.total || 0}</span> results
               </p>
             </div>
             <div>
               <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
                 <button
-                  className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium ${
+                    currentPage === 1 
+                      ? 'text-gray-300 cursor-not-allowed' 
+                      : 'text-gray-500 hover:bg-gray-50 cursor-pointer'
+                  }`}
                   disabled={currentPage === 1}
                 >
                   <span className="sr-only">Previous</span>
@@ -489,14 +479,33 @@ export default function UsersManagement() {
                     <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
                 </button>
+                
+                {/* Page numbers */}
+                {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                  const pageNum = i + 1;
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                        currentPage === pageNum
+                          ? 'z-10 bg-navy-50 border-navy-500 text-navy-600'
+                          : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+                
                 <button
-                  className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  1
-                </button>
-                <button
-                  className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-                  disabled={true}
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium ${
+                    currentPage === totalPages 
+                      ? 'text-gray-300 cursor-not-allowed' 
+                      : 'text-gray-500 hover:bg-gray-50 cursor-pointer'
+                  }`}
+                  disabled={currentPage === totalPages}
                 >
                   <span className="sr-only">Next</span>
                   <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">

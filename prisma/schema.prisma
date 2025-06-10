@@ -24,6 +24,10 @@ model User {
   portfolioItems PortfolioItem[]
   watchlistItems WatchlistItem[]
   activities     Activity[]
+  supportTickets SupportTicket[]
+  chatSessions   ChatSession[]
+  chatMessages   ChatMessage[]
+  transactions   Transaction[]  // Added relation to Transaction model
 
   @@index([clerk_id])
 }
@@ -102,10 +106,83 @@ model AdminActivity {
   id          String           @id @default(cuid())
   admin_id    String
   action_type AdminActionType
+  description String           // Added description field
   details     Json?
+  metadata    Json?           // Added metadata field for compatibility
   created_at  DateTime         @default(now())
 
   @@index([admin_id])
+  @@index([created_at])
+}
+
+// Support tickets
+model SupportTicket {
+  id          String           @id @default(cuid())
+  subject     String
+  message     String
+  status      TicketStatus     @default(OPEN)
+  assigned_to String?          // admin clerk_id
+  created_at  DateTime         @default(now())
+  updated_at  DateTime         @updatedAt
+  
+  // Relations
+  user        User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id     String
+  replies     TicketReply[]
+
+  @@index([user_id])
+  @@index([status])
+  @@index([created_at])
+}
+
+// Support ticket replies
+model TicketReply {
+  id          String   @id @default(cuid())
+  message     String
+  is_admin    Boolean  // true if sent by admin, false if sent by user
+  admin_id    String?  // clerk_id of admin if is_admin is true
+  created_at  DateTime @default(now())
+  
+  // Relations
+  ticket      SupportTicket @relation(fields: [ticket_id], references: [id], onDelete: Cascade)
+  ticket_id   String
+
+  @@index([ticket_id])
+  @@index([created_at])
+}
+
+// Live chat sessions
+model ChatSession {
+  id          String       @id @default(cuid())
+  status      ChatStatus   @default(ACTIVE)
+  created_at  DateTime     @default(now())
+  updated_at  DateTime     @updatedAt
+  
+  // Relations
+  user        User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id     String
+  admin_id    String?      // clerk_id of assigned admin
+  messages    ChatMessage[]
+
+  @@index([user_id])
+  @@index([status])
+  @@index([created_at])
+}
+
+// Chat messages
+model ChatMessage {
+  id          String   @id @default(cuid())
+  message     String
+  is_admin    Boolean  // true if sent by admin, false if sent by user
+  created_at  DateTime @default(now())
+  
+  // Relations
+  session     ChatSession @relation(fields: [session_id], references: [id], onDelete: Cascade)
+  session_id  String
+  user        User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id     String     // user who sent the message (could be admin's user record)
+
+  @@index([session_id])
   @@index([created_at])
 }
 
@@ -130,4 +207,36 @@ enum AdminActionType {
   SYSTEM_CONFIG
   DATA_EXPORT
   OTHER
+}
+
+enum TicketStatus {
+  OPEN
+  PENDING
+  CLOSED
+}
+
+enum ChatStatus {
+  ACTIVE
+  CLOSED
+}
+
+// Transaction model
+model Transaction {
+  id            String            @id @default(cuid())
+  user_id       String
+  user          User              @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  type          String            // 'deposit', 'withdrawal', 'trade', 'subscription'
+  asset         String            // 'USD', 'BTC', 'ETH', 'USDT'
+  amount        Float
+  fee           Float             @default(0)
+  status        String            // 'pending', 'approved', 'declined', 'refunded'
+  reference_id  String            @unique
+  metadata      Json?             // Additional transaction data
+  created_at    DateTime          @default(now())
+  processed_at  DateTime?
+  
+  @@index([user_id])
+  @@index([status])
+  @@index([created_at])
+  @@index([type])
 }

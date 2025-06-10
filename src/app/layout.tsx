@@ -5,6 +5,7 @@ import "./globals.css";
 import Header from './components/Header';
 import QuickActionSidebar from './components/QuickActionSidebar';
 import FloatingActionButton from './components/FloatingActionButton';
+import ReactQueryProvider from './providers/ReactQueryProvider';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,12 +33,14 @@ export default function RootLayout({
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-50`}
         >
-          <Header />
-          <main className="min-h-screen">
-            {children}
-          </main>
-          <QuickActionSidebar />
-          <FloatingActionButton />
+          <ReactQueryProvider>
+            <Header />
+            <main className="min-h-screen">
+              {children}
+            </main>
+            <QuickActionSidebar />
+            <FloatingActionButton />
+          </ReactQueryProvider>
         </body>
       </html>
     </ClerkProvider>
