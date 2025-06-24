@@ -14,7 +14,7 @@ import {
   ClockIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
-import { SupportTicket } from '@/lib/adminApi';
+import { SupportTicket } from '@/lib/api/types';
 import {
   ticketReplySchema,
   ticketUpdateSchema,
@@ -240,7 +240,7 @@ const SupportTicketForm: React.FC<SupportTicketFormProps> = ({
                 </label>
                 <select
                   value={ticketStatus}
-                  onChange={(e) => setTicketStatus(e.target.value)}
+                  onChange={(e) => setTicketStatus(e.target.value as 'pending' | 'open' | 'closed')}
                   className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 ${
                     errors.status ? 'border-red-500' : 'border-gray-300'
                   }`}

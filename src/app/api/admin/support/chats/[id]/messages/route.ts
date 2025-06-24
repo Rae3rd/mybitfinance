@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { prisma } from '@/lib/prisma';
+import prisma from '@/lib/prisma';
 import { z } from 'zod';
 
 // Message validation schema
@@ -60,6 +60,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       data: {
         admin_id: userId,
         action_type: 'USER_MANAGEMENT',
+        description: 'Admin sent message in support chat',
         details: JSON.stringify({
           chatId,
           messageId: message.id

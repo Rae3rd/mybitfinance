@@ -1,24 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
-import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
-
-// Helper function to check admin permissions
-async function checkAdminPermissions() {
-  const { userId, sessionClaims } = await auth();
-
-  if (!userId) {
-    throw new Error('Unauthorized: Not authenticated');
-  }
-
-  // Check if user has admin role
-  const userRole = (sessionClaims?.metadata as { role?: string })?.role || '';
-  if (!['admin', 'super_admin'].includes(userRole)) {
-    throw new Error('Unauthorized: Only admins can process refunds');
-  }
-
-  return { userId, role: userRole as string };
-}
+import { checkRolePermissions } from '@/lib/auth/server';
+import { getTransactionById, createTransaction, updateTransaction } from '@/lib/data/transactions';
+import { prisma } from '@/lib/prisma';
 
 // Schema for refund request
 const refundSchema = z.object({
@@ -31,16 +15,15 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { userId, role } = await checkAdminPermissions();
+    // Check if user has admin permissions (only admin and super_admin can refund)
+    const { userId, role } = await checkRolePermissions(['admin', 'super_admin']);
 
     const transactionId = params.id;
     const body = await request.json();
     const { reason } = refundSchema.parse(body);
 
     // Check if transaction exists and is eligible for refund
-    const existingTransaction = await prisma.transaction.findUnique({
-      where: { id: transactionId },
-    });
+    const existingTransaction = await getTransactionById(transactionId);
 
     if (!existingTransaction) {
       return NextResponse.json(
@@ -71,41 +54,36 @@ export async function POST(
       );
     }
 
-    // Create a new refund transaction
-    const refundTransaction = await prisma.transaction.create({
-      data: {
-        user_id: existingTransaction.user_id,
-        type: existingTransaction.type === 'deposit' ? 'withdrawal' : 'deposit',
-        asset: existingTransaction.asset,
-        amount: existingTransaction.amount,
-        status: 'approved',
-        reference_id: `refund-${existingTransaction.reference_id}`,
-        processed_at: new Date(),
-        metadata: {
-          original_transaction_id: existingTransaction.id,
-          refund_reason: reason,
-          processed_by: userId,
-        },
+    // Create a new refund transaction using the data access layer
+    const refundTransaction = await createTransaction({
+      user: { connect: { id: existingTransaction.user_id } },
+      type: existingTransaction.type === 'deposit' ? 'withdrawal' : 'deposit',
+      asset: existingTransaction.asset, // Use the asset string directly
+      amount: existingTransaction.amount,
+      status: 'approved',
+      reference_id: `refund-${existingTransaction.reference_id}`,
+      processed_at: new Date(),
+      metadata: {
+        original_transaction_id: existingTransaction.id,
+        refund_reason: reason,
+        processed_by: userId,
       },
     });
 
     // Update original transaction to mark as refunded
-    const updatedTransaction = await prisma.transaction.update({
-      where: { id: transactionId },
-      data: {
-        status: 'refunded',
-        metadata: existingTransaction.metadata && typeof existingTransaction.metadata === 'object' ? {
-          ...(existingTransaction.metadata as Record<string, any>),
-          refunded_at: new Date(),
-          refund_reason: reason,
-          refund_transaction_id: refundTransaction.id,
-          refunded_by: userId,
-        } : {
-          refunded_at: new Date(),
-          refund_reason: reason,
-          refund_transaction_id: refundTransaction.id,
-          refunded_by: userId,
-        },
+    const updatedTransaction = await updateTransaction(transactionId, {
+      status: 'refunded',
+      metadata: existingTransaction.metadata && typeof existingTransaction.metadata === 'object' ? {
+        ...(existingTransaction.metadata as Record<string, any>),
+        refunded_at: new Date(),
+        refund_reason: reason,
+        refund_transaction_id: refundTransaction.id,
+        refunded_by: userId,
+      } : {
+        refunded_at: new Date(),
+        refund_reason: reason,
+        refund_transaction_id: refundTransaction.id,
+        refunded_by: userId,
       },
     });
 
@@ -114,6 +92,7 @@ export async function POST(
       data: {
         admin_id: userId,
         action_type: 'SYSTEM_CONFIG',
+        description: `Refunded transaction ${transactionId}`, // Add required description field
         details: {
           action: 'transaction_refund',
           target_type: 'transaction',

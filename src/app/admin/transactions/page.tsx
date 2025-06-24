@@ -7,12 +7,11 @@ import {
   ArrowUpIcon,
   CheckCircleIcon,
   XCircleIcon,
-  FilterIcon,
-  RefreshCwIcon,
-  SearchIcon,
+  FunnelIcon,
+  ArrowPathIcon,
+  MagnifyingGlassIcon,
   CalendarIcon,
   CreditCardIcon,
-  ArrowPathIcon,
   BanknotesIcon,
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
@@ -21,7 +20,8 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import TransactionDetailModal from '../components/modals/TransactionDetailModal';
 import TransactionForm from '../components/forms/TransactionForm';
-import { adminApi, Transaction } from '@/lib/adminApi';
+import { adminApi } from '@/lib/api/server/adminApi';
+import { Transaction } from '@/lib/api/types';
 
 export default function TransactionsManagement() {
   // State for filters and pagination
@@ -46,7 +46,7 @@ export default function TransactionsManagement() {
     type: filterType !== 'all' ? filterType : undefined,
     dateFrom: dateRange.from || undefined,
     dateTo: dateRange.to || undefined,
-    search: searchQuery || undefined,
+    // Remove search parameter as it's not in the accepted parameters
   });
 
   if (error) {
@@ -57,7 +57,7 @@ export default function TransactionsManagement() {
   const totalPages = transactionsData?.pagination?.totalPages || 1;
 
   // Fallback empty state
-  const fallbackTransactions = [];
+  const fallbackTransactions: Transaction[] = [];
 
   // Use transactions if available, otherwise use fallback
   const displayTransactions = transactions.length > 0 ? transactions : fallbackTransactions;
@@ -87,10 +87,11 @@ export default function TransactionsManagement() {
   };
 
   // Event handlers
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
     setCurrentPage(1);
-    updateFilters({ search: e.target.value, page: 1 });
+    // Note: search parameter is not supported in the API
+    updateFilters({ page: 1 });
   };
 
   const handleFilterChange = (status: string) => {
@@ -189,14 +190,14 @@ export default function TransactionsManagement() {
         <div className="p-4 sm:p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
           <div className="relative flex-1 max-w-md">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <SearchIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
+              <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
             </div>
             <input
               type="text"
               name="search"
               id="search"
               value={searchQuery}
-              onChange={handleSearchChange}
+              onChange={handleSearch}
               className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-navy-500 focus:border-navy-500 sm:text-sm"
               placeholder="Search by user or reference ID"
             />
@@ -208,7 +209,7 @@ export default function TransactionsManagement() {
               onClick={() => setShowFilters(!showFilters)}
               className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-navy-500"
             >
-              <FilterIcon className="-ml-0.5 mr-2 h-4 w-4" aria-hidden="true" />
+              <FunnelIcon className="-ml-0.5 mr-2 h-4 w-4" aria-hidden="true" />
               Filters
             </button>
             <button
@@ -216,7 +217,7 @@ export default function TransactionsManagement() {
               onClick={refreshData}
               className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-navy-500"
             >
-              <RefreshCwIcon className="-ml-0.5 mr-2 h-4 w-4" aria-hidden="true" />
+              <ArrowPathIcon className="-ml-0.5 mr-2 h-4 w-4" aria-hidden="true" />
               Refresh
             </button>
           </div>
@@ -361,7 +362,7 @@ export default function TransactionsManagement() {
                 <tr>
                   <td colSpan={7} className="px-6 py-4 text-center text-sm text-gray-500">
                     <div className="flex justify-center items-center space-x-2">
-                      <RefreshCwIcon className="h-5 w-5 animate-spin" />
+                      <ArrowPathIcon className="h-5 w-5 animate-spin" />
                       <span>Loading transactions...</span>
                     </div>
                   </td>
@@ -385,7 +386,7 @@ export default function TransactionsManagement() {
                             <span className="text-xs font-medium text-gray-500">
                               {transaction.user.name
                                 .split(' ')
-                                .map((n) => n[0])
+                                .map((n: string) => n[0])
                                 .join('')}
                             </span>
                           </div>

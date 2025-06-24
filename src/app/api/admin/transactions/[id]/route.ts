@@ -1,72 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
-import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
-
-// Helper function to check admin permissions
-async function checkAdminPermissions(req: NextRequest): Promise<{ userId: string; role: string }> {
-  const { userId, sessionClaims } = await auth();
-
-  if (!userId) {
-    throw new Error('Unauthorized: Not authenticated');
-  }
-
-  // Check if user has admin role
-  const userRole = (sessionClaims?.metadata as Record<string, unknown>)?.role as string | undefined;
-  if (!userRole || !['admin', 'super_admin', 'moderator', 'auditor'].includes(userRole)) {
-    throw new Error('Unauthorized: Insufficient permissions');
-  }
-
-  // Auditors can only read data, not modify it
-  if (userRole === 'auditor') {
-    throw new Error('Unauthorized: Auditors have read-only access');
-  }
-
-  return { userId, role: userRole };
-}
+import { checkAdminPermissions, checkRolePermissions } from '../../../../../lib/auth/server';
+import { getTransactionById, updateTransaction } from '../../../../../lib/data/transactions';
+import { prisma } from '../../../../../lib/prisma';
 
 // Get single transaction
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const { userId, role } = await checkAdminPermissions(req);
+    // Check if user has admin permissions (including auditors who can read)
+    await checkAdminPermissions();
     const transactionId = params.id;
 
-    // Fetch the transaction
-    const transaction = await prisma.transaction.findUnique({
-      where: { id: transactionId },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            first_name: true,
-            last_name: true,
-            phone: true,
-            country: true,
-          }
-        }
-      }
-    }) as unknown as {
-      id: string;
-      user_id: string;
-      type: string;
-      asset: string;
-      amount: number;
-      fee: number;
-      status: string;
-      reference_id: string;
-      metadata: any;
-      created_at: Date;
-      processed_at: Date | null;
-      user: {
-        id: string;
-        email: string;
-        first_name: string | null;
-        last_name: string | null;
-        phone: string | null;
-        country: string | null;
-      };
-    };
+    // Fetch the transaction using the data access layer
+    const transaction = await getTransactionById(transactionId);
 
     if (!transaction) {
       return NextResponse.json(
@@ -75,13 +21,14 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       );
     }
 
-    // Enhance transaction with user name
+    // Enhance transaction with user info
     const enhancedTransaction = {
       ...transaction,
       user: transaction.user
         ? {
-            ...(transaction.user as Record<string, any>),
-            name: `${(transaction.user as Record<string, any>).first_name || ''} ${(transaction.user as Record<string, any>).last_name || ''}`.trim(),
+            ...transaction.user,
+            // User model doesn't have first_name/last_name fields, use clerk_id as identifier
+            name: `User ${transaction.user.clerk_id}`,
           }
         : undefined,
     };
@@ -118,38 +65,15 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { userId, role } = await checkAdminPermissions(request);
+    // Check if user has write permissions (excluding auditors)
+    const { userId, role } = await checkRolePermissions(['admin', 'super_admin', 'moderator']);
 
     const transactionId = params.id;
     const body = await request.json();
     const updateData = updateTransactionSchema.parse(body);
 
     // Check if transaction exists
-    const existingTransaction = await prisma.transaction.findUnique({
-      where: { id: transactionId },
-      include: {
-        user: {
-          select: {
-            id: true
-          }
-        }
-      }
-    }) as unknown as {
-      id: string;
-      user_id: string;
-      type: string;
-      asset: string;
-      amount: number;
-      fee: number;
-      status: string;
-      reference_id: string;
-      metadata: any;
-      created_at: Date;
-      processed_at: Date | null;
-      user: {
-        id: string;
-      };
-    };
+    const existingTransaction = await getTransactionById(transactionId);
 
     if (!existingTransaction) {
       return NextResponse.json(
@@ -173,53 +97,24 @@ export async function PUT(
       );
     }
 
-    // Update transaction
-    const updatedTransaction = await prisma.transaction.update({
-      where: { id: transactionId },
-      data: {
-        status: updateData.status,
-        processed_at: new Date(),
-        metadata: {
-          ...(existingTransaction.metadata ? (existingTransaction.metadata as Record<string, any>) : {}),
-          admin_note: updateData.reason,
-          processed_by: userId,
-        },
+    // Update transaction using the data access layer
+    const updatedTransaction = await updateTransaction(transactionId, {
+      status: updateData.status,
+      processed_at: new Date(),
+      metadata: {
+        // Ensure metadata is treated as an object before spreading
+        ...(typeof existingTransaction.metadata === 'object' && existingTransaction.metadata !== null ? existingTransaction.metadata : {}),
+        admin_note: updateData.reason,
+        processed_by: userId,
       },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            first_name: true,
-            last_name: true,
-          }
-        }
-      }
-    }) as unknown as {
-      id: string;
-      user_id: string;
-      type: string;
-      asset: string;
-      amount: number;
-      fee: number;
-      status: string;
-      reference_id: string;
-      metadata: any;
-      created_at: Date;
-      processed_at: Date;
-      user: {
-        id: string;
-        email: string;
-        first_name: string | null;
-        last_name: string | null;
-      };
-    };
+    });
 
     // Log the action in audit trail
     await prisma.adminActivity.create({
       data: {
         admin_id: userId,
         action_type: 'OTHER',
+        description: `Transaction ${transactionId} status changed to ${updateData.status}`,
         details: {
           action: `transaction_${updateData.status}`,
           target_type: 'transaction',
@@ -231,13 +126,14 @@ export async function PUT(
       },
     });
 
-    // Enhance transaction with user name
+    // Enhance transaction with user info
     const enhancedTransaction = {
       ...updatedTransaction,
       user: updatedTransaction.user
         ? {
-            ...(updatedTransaction.user as Record<string, any>),
-            name: `${(updatedTransaction.user as Record<string, any>).first_name || ''} ${(updatedTransaction.user as Record<string, any>).last_name || ''}`.trim(),
+            ...updatedTransaction.user,
+            // User model doesn't have first_name/last_name fields, use clerk_id as identifier
+            name: `User ${updatedTransaction.user.clerk_id}`,
           }
         : undefined,
     };

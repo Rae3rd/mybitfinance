@@ -403,20 +403,6 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
             </motion.div>
           </motion.div>
         </main>
-
-        {/* Footer */}
-        <footer className="bg-white border-t border-gray-200 py-4">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center">
-              <p className="text-xs text-gray-500">
-                &copy; {new Date().getFullYear()} MyBitFinance Admin Panel
-              </p>
-              <Link href="/admin/logs" className="text-xs text-emerald-600 hover:text-emerald-500">
-                System Logs
-              </Link>
-            </div>
-          </div>
-        </footer>
       </div>
     </div>
   );

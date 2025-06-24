@@ -115,6 +115,20 @@ model AdminActivity {
   @@index([created_at])
 }
 
+// Admin notifications
+model AdminNotification {
+  id            String   @id @default(cuid())
+  type          String   // 'user_registration', 'transaction_pending', 'support_message', 'system_alert'
+  message       String
+  related_entity String?
+  related_id    String?
+  is_read       Boolean  @default(false)
+  created_at    DateTime @default(now())
+
+  @@index([is_read])
+  @@index([created_at])
+}
+
 // Support tickets
 model SupportTicket {
   id          String           @id @default(cuid())

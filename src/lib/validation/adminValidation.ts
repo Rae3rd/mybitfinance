@@ -55,7 +55,8 @@ export const ticketCreateSchema = z.object({
 });
 
 // Investment plan validation schemas
-export const planCreateSchema = z.object({
+// Define the base schema without refinements
+const planBaseSchema = z.object({
   name: z.string().min(1, 'Plan name is required').max(100, 'Plan name must be less than 100 characters'),
   description: z.string().min(1, 'Description is required').max(500, 'Description must be less than 500 characters'),
   min_investment: z.number().min(1, 'Minimum investment must be at least $1'),
@@ -66,12 +67,28 @@ export const planCreateSchema = z.object({
     errorMap: () => ({ message: 'Invalid risk level' })
   }),
   is_active: z.boolean().default(true),
-}).refine((data) => data.max_investment >= data.min_investment, {
+});
+
+// Create the full schema with refinements for create operations
+export const planCreateSchema = planBaseSchema.refine((data) => data.max_investment >= data.min_investment, {
   message: 'Maximum investment must be greater than or equal to minimum investment',
   path: ['max_investment'],
 });
 
-export const planUpdateSchema = planCreateSchema.partial();
+// Create the update schema by making the base schema partial first, then adding refinements
+export const planUpdateSchema = planBaseSchema.partial().refine(
+  (data) => {
+    // Skip validation if both fields are not provided
+    if (data.min_investment === undefined || data.max_investment === undefined) {
+      return true;
+    }
+    return data.max_investment! >= data.min_investment!;
+  },
+  {
+    message: 'Maximum investment must be greater than or equal to minimum investment',
+    path: ['max_investment'],
+  }
+);
 
 // Settings validation schemas
 export const generalSettingsSchema = z.object({
@@ -95,7 +112,7 @@ export const paymentGatewaySchema = z.object({
   test_mode: z.boolean().default(false),
 });
 
-// Notification validation schemas
+// Notification validation schemas for UI
 export const notificationCreateSchema = z.object({
   title: z.string().min(1, 'Title is required').max(100, 'Title must be less than 100 characters'),
   message: z.string().min(1, 'Message is required').max(500, 'Message must be less than 500 characters'),
@@ -105,6 +122,16 @@ export const notificationCreateSchema = z.object({
   target_users: z.array(z.string()).optional(), // Array of user IDs
   broadcast_to_all: z.boolean().default(false),
   scheduled_at: z.string().datetime().optional(),
+});
+
+// API notification schema that matches the AdminNotification interface
+export const notificationSchema = z.object({
+  type: z.enum(['user_registration', 'transaction_pending', 'support_message', 'system_alert'], {
+    errorMap: () => ({ message: 'Invalid notification type' })
+  }),
+  message: z.string().min(1, 'Message is required').max(500, 'Message must be less than 500 characters'),
+  related_entity: z.string().optional(),
+  related_id: z.string().optional(),
 });
 
 // Analytics filter validation
@@ -182,6 +209,7 @@ export type PlanUpdateData = z.infer<typeof planUpdateSchema>;
 export type GeneralSettingsData = z.infer<typeof generalSettingsSchema>;
 export type PaymentGatewayData = z.infer<typeof paymentGatewaySchema>;
 export type NotificationCreateData = z.infer<typeof notificationCreateSchema>;
+export type NotificationData = z.infer<typeof notificationSchema>;
 export type AnalyticsFilterData = z.infer<typeof analyticsFilterSchema>;
 export type BulkUserActionData = z.infer<typeof bulkUserActionSchema>;
 export type BulkTransactionActionData = z.infer<typeof bulkTransactionActionSchema>;

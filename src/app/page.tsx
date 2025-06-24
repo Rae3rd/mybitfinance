@@ -2,7 +2,6 @@ import { auth } from '@clerk/nextjs/server';
 import Link from 'next/link';
 import PriceMarquee from './components/PriceMarquee';
 import Reviews from './components/Reviews';
-import Footer from './components/Footer';
 import TransactionPopup from './components/TransactionPopup';
 import TradingChart from './components/TradingChart';
 import MarketTrendsHeatmap from './components/MarketTrendsHeatmap';
@@ -276,9 +275,6 @@ export default async function Home() {
 
       {/* Customer Reviews Section */}
       <Reviews />
-
-      {/* Footer */}
-      <Footer />
     </main>
   );
 }

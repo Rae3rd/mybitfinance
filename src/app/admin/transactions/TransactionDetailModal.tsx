@@ -3,7 +3,7 @@
 import React from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
-import { Transaction } from '@/lib/adminApi';
+import { Transaction } from '@/lib/api/types';
 import TransactionForm from '../components/forms/TransactionForm';
 
 interface TransactionDetailModalProps {
@@ -45,7 +45,7 @@ const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
             leaveFrom="opacity-100"
             leaveTo="opacity-0"
           >
-            <Dialog.Overlay className="fixed inset-0 bg-black opacity-30" />
+            <div className="fixed inset-0 bg-black opacity-30" aria-hidden="true" />
           </Transition.Child>
 
           {/* This element is to trick the browser into centering the modal contents. */}

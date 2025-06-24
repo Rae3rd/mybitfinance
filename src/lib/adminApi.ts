@@ -112,10 +112,15 @@ class AdminApiService {
         throw new Error('Not authenticated');
       }
       
+      // Extract role from sessionClaims metadata safely
+      const role = sessionClaims?.metadata && typeof sessionClaims.metadata === 'object' 
+        ? (sessionClaims.metadata as { role?: string }).role || 'user'
+        : 'user';
+        
       return {
         'Content-Type': 'application/json',
         'X-User-Id': userId,
-        'X-User-Role': sessionClaims?.metadata?.role || 'user'
+        'X-User-Role': role
       };
     } catch (error) {
       console.error('Failed to get auth token:', error);

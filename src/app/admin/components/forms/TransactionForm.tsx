@@ -14,7 +14,7 @@ import {
   CalendarIcon,
   CurrencyDollarIcon,
 } from '@heroicons/react/24/outline';
-import { Transaction } from '@/lib/adminApi';
+import { Transaction } from '@/lib/api/types';
 import {
   transactionUpdateSchema,
   refundSchema,

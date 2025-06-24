@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { prisma } from '@/lib/prisma';
+import prisma from '@/lib/prisma';
 
 // GET /api/admin/support/chats/:id - Get a specific chat session with all messages
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
@@ -85,6 +85,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       data: {
         admin_id: userId,
         action_type: 'USER_MANAGEMENT',
+        description: 'Support chat status or assignment updated',
         details: JSON.stringify({
           chatId,
           previousStatus: updatedChat.status,

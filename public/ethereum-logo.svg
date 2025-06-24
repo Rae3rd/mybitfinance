@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-ethereum">
+  <polygon points="12 2 20 12 12 22 4 12" fill="#ffffff"/>
+  <polyline points="12 2 12 22" fill="#ffffff"/>
+  <polyline points="4 12 20 12" fill="#ffffff"/>
+</svg>

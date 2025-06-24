@@ -13,13 +13,36 @@ import {
   CalendarIcon,
   UserIcon,
 } from '@heroicons/react/24/outline';
-import { AdminNotification } from '@/lib/adminApi';
+import { AdminNotification } from '@/lib/api/types';
 import {
   notificationSchema,
+  notificationCreateSchema,
   NotificationData,
+  NotificationCreateData,
   getValidationErrors,
 } from '@/lib/validation/adminValidation';
-import { useNotificationMutations } from '@/lib/hooks/useAdminData';
+import { useMarkNotificationRead } from '@/lib/hooks/useAdminApi';
+import { useCreateNotification } from '@/lib/hooks/useAdminApi';
+
+// Helper function to map API notification types to UI types
+const mapApiTypeToFormType = (apiType: string): 'info' | 'success' | 'warning' | 'error' => {
+  switch (apiType) {
+    case 'user_registration': return 'success';
+    case 'transaction_pending': return 'warning';
+    case 'support_message': return 'error';
+    default: return 'info';
+  }
+};
+
+// Helper function to map UI notification types to API types
+const mapFormTypeToApiType = (formType: string): 'user_registration' | 'transaction_pending' | 'support_message' | 'system_alert' => {
+  switch (formType) {
+    case 'success': return 'user_registration';
+    case 'warning': return 'transaction_pending';
+    case 'error': return 'support_message';
+    default: return 'system_alert';
+  }
+};
 
 interface NotificationFormProps {
   notification?: AdminNotification;
@@ -28,23 +51,34 @@ interface NotificationFormProps {
   mode: 'create' | 'view' | 'markRead';
 }
 
+// Extended interface for UI form data that includes UI-only fields
+interface ExtendedNotificationFormData extends NotificationCreateData {
+  priority?: 'low' | 'medium' | 'high';
+}
+
 const NotificationForm: React.FC<NotificationFormProps> = ({
   notification,
   onSuccess,
   onCancel,
   mode,
 }) => {
-  const { markAsRead } = useNotificationMutations();
+  const { mutateAsync: markAsRead, isPending: isMarkingAsRead } = useMarkNotificationRead();
+  const { mutateAsync: createNotification, isPending: isCreating } = useCreateNotification();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [formData, setFormData] = useState<NotificationData>({
-    title: notification?.title || '',
+  const [formData, setFormData] = useState<ExtendedNotificationFormData>({
+    // Title is a UI-only field, not present in the AdminNotification API type
+    // It's used for display purposes in the form but not sent to the API
+    title: '', 
     message: notification?.message || '',
-    type: notification?.type || 'info',
-    priority: notification?.priority || 'medium',
+    type: notification?.type ? mapApiTypeToFormType(notification.type) : 'info',
+    // Priority is a UI-only field, not present in the AdminNotification API type
+    // It's used for display purposes in the form but not sent to the API
+    priority: 'medium',
+    broadcast_to_all: false,
   });
 
-  const handleInputChange = (field: keyof NotificationData, value: string) => {
+  const handleInputChange = (field: keyof ExtendedNotificationFormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
@@ -53,9 +87,10 @@ const NotificationForm: React.FC<NotificationFormProps> = ({
 
   const validateForm = () => {
     try {
-      notificationSchema.parse(formData);
+      notificationCreateSchema.parse(formData);
       setErrors({});
       return true;
+      
     } catch (error) {
       if (error instanceof z.ZodError) {
         setErrors(getValidationErrors(error));
@@ -68,12 +103,14 @@ const NotificationForm: React.FC<NotificationFormProps> = ({
     e.preventDefault();
 
     if (mode === 'markRead' && notification) {
-      setIsSubmitting(true);
       try {
-        await markAsRead.mutateAsync(notification.id);
+        setIsSubmitting(true);
+        await markAsRead(notification.id);
+        toast.success('Notification marked as read');
         onSuccess?.();
       } catch (error) {
         console.error('Mark notification as read error:', error);
+        toast.error('Failed to mark notification as read');
       } finally {
         setIsSubmitting(false);
       }
@@ -86,10 +123,19 @@ const NotificationForm: React.FC<NotificationFormProps> = ({
         return;
       }
 
-      setIsSubmitting(true);
       try {
-        // In a real implementation, you would call an API to create the notification
-        // For now, we'll just show a success message
+        setIsSubmitting(true);
+        // Map form data to API request format
+        // IMPORTANT: The AdminNotification type only includes type, message, related_entity, and related_id
+        // title and priority are UI-only fields and not sent to the API
+        const notificationData = {
+          type: mapFormTypeToApiType(formData.type),
+          message: formData.message,
+          // We don't include title or priority as they are UI-only fields
+          // and not part of the AdminNotification type in the API
+        };
+        
+        await createNotification(notificationData);
         toast.success('Notification created successfully');
         onSuccess?.();
       } catch (error) {
@@ -100,6 +146,8 @@ const NotificationForm: React.FC<NotificationFormProps> = ({
       }
     }
   };
+  
+  // These helper functions are now defined at the top of the file
 
   const getTypeIcon = (type: string) => {
     switch (type) {
@@ -149,9 +197,10 @@ const NotificationForm: React.FC<NotificationFormProps> = ({
       case 'create':
         return 'Create Notification';
       case 'markRead':
-        return 'Mark as Read';
+      case 'view':
+        return 'Notification';
       default:
-        return 'Notification Details';
+        return 'Notification';
     }
   };
 
@@ -180,11 +229,11 @@ const NotificationForm: React.FC<NotificationFormProps> = ({
       {/* Notification Details (View Mode) */}
       {mode === 'view' && notification && (
         <div className="space-y-4">
-          <div className={`p-4 rounded-lg border ${getTypeColor(notification.type)}`}>
+          <div className={`p-4 rounded-lg border ${getTypeColor(mapApiTypeToFormType(notification.type))}`}>
             <div className="flex items-start">
-              {getTypeIcon(notification.type)}
+              {getTypeIcon(mapApiTypeToFormType(notification.type))}
               <div className="ml-3 flex-1">
-                <h3 className="text-lg font-semibold">{notification.title}</h3>
+                <h3 className="text-lg font-semibold">Notification</h3>
                 <p className="mt-2 text-sm">{notification.message}</p>
               </div>
             </div>
@@ -192,10 +241,11 @@ const NotificationForm: React.FC<NotificationFormProps> = ({
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div className="space-y-2">
+              {/* Display notification type - this is from the API */}
               <div className="flex items-center">
-                <span className="text-gray-600">Priority:</span>
-                <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(notification.priority)}`}>
-                  {notification.priority.charAt(0).toUpperCase() + notification.priority.slice(1)}
+                <span className="text-gray-600">Type:</span>
+                <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${getTypeColor(mapApiTypeToFormType(notification.type))}`}>
+                  {mapApiTypeToFormType(notification.type).charAt(0).toUpperCase() + mapApiTypeToFormType(notification.type).slice(1)}
                 </span>
               </div>
               
@@ -210,16 +260,16 @@ const NotificationForm: React.FC<NotificationFormProps> = ({
               <div className="flex items-center">
                 <span className="text-gray-600">Status:</span>
                 <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${
-                  notification.read ? 'bg-gray-100 text-gray-800' : 'bg-blue-100 text-blue-800'
+                  notification.is_read ? 'bg-gray-100 text-gray-800' : 'bg-blue-100 text-blue-800'
                 }`}>
-                  {notification.read ? 'Read' : 'Unread'}
+                  {notification.is_read ? 'Read' : 'Unread'}
                 </span>
               </div>
               
-              {notification.read && notification.read_at && (
+              {notification.is_read && (
                 <div className="flex items-center">
                   <span className="text-gray-600">Read at:</span>
-                  <span className="ml-2">{formatDate(notification.read_at)}</span>
+                  <span className="ml-2">{formatDate(notification.created_at)}</span>
                 </div>
               )}
             </div>
@@ -245,7 +295,7 @@ const NotificationForm: React.FC<NotificationFormProps> = ({
           </div>
           
           <div className="bg-gray-50 rounded-lg p-4">
-            <h4 className="font-medium text-gray-900 mb-2">{notification.title}</h4>
+            <h4 className="font-medium text-gray-900 mb-2">Notification</h4>
             <p className="text-sm text-gray-700">{notification.message}</p>
           </div>
         </div>
@@ -318,7 +368,7 @@ const NotificationForm: React.FC<NotificationFormProps> = ({
               </label>
               <select
                 value={formData.priority}
-                onChange={(e) => handleInputChange('priority', e.target.value)}
+                onChange={(e) => handleInputChange('priority', e.target.value as 'low' | 'medium' | 'high')}
                 className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 ${
                   errors.priority ? 'border-red-500' : 'border-gray-300'
                 }`}
@@ -353,9 +403,9 @@ const NotificationForm: React.FC<NotificationFormProps> = ({
             type="submit"
             onClick={handleSubmit}
             className="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 flex items-center"
-            disabled={isSubmitting || markAsRead.isPending}
+            disabled={isSubmitting || isMarkingAsRead || isCreating}
           >
-            {isSubmitting || markAsRead.isPending
+            {isSubmitting || isMarkingAsRead || isCreating
               ? (mode === 'create' ? 'Creating...' : 'Marking as Read...')
               : (mode === 'create' ? 'Create Notification' : 'Mark as Read')
             }

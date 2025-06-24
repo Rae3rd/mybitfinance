@@ -2,36 +2,38 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { BanknotesIcon as CashIcon, ChartBarIcon, MagnifyingGlassIcon as SearchIcon, BoltIcon as LightningBoltIcon } from '@heroicons/react/24/outline';
+import { BanknotesIcon as CashIcon, ChartBarIcon, MagnifyingGlassIcon as SearchIcon, BoltIcon as LightningBoltIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
+import Link from 'next/link';
 
 export default function QuickActions() {
   const [activeAction, setActiveAction] = useState<number | null>(null);
   const actions = [
     {
+      title: 'Deposit Funds',
+      description: 'Add money to your account',
+      icon: <ArrowDownTrayIcon className="w-5 h-5" />,
+      color: 'from-emerald-500 to-emerald-600',
+      hoverEffect: { y: -5, boxShadow: '0 10px 15px -3px rgba(16, 185, 129, 0.3)' },
+      link: '/dashboard/wallet'
+    },
+    {
       title: 'Add Investment',
       description: 'Buy stocks or crypto',
       icon: <CashIcon className="w-5 h-5" />,
-      color: 'from-emerald-500 to-emerald-600',
-      hoverEffect: { y: -5, boxShadow: '0 10px 15px -3px rgba(16, 185, 129, 0.3)' },
+      color: 'from-blue-500 to-blue-600',
+      hoverEffect: { y: -5, boxShadow: '0 10px 15px -3px rgba(59, 130, 246, 0.3)' },
     },
     {
       title: 'View Portfolio',
       description: 'Detailed analysis',
       icon: <ChartBarIcon className="w-5 h-5" />,
-      color: 'from-blue-500 to-blue-600',
-      hoverEffect: { y: -5, boxShadow: '0 10px 15px -3px rgba(59, 130, 246, 0.3)' },
+      color: 'from-purple-500 to-purple-600',
+      hoverEffect: { y: -5, boxShadow: '0 10px 15px -3px rgba(139, 92, 246, 0.3)' },
     },
     {
       title: 'Market Research',
       description: 'Explore opportunities',
       icon: <SearchIcon className="w-5 h-5" />,
-      color: 'from-purple-500 to-purple-600',
-      hoverEffect: { y: -5, boxShadow: '0 10px 15px -3px rgba(139, 92, 246, 0.3)' },
-    },
-    {
-      title: 'Quick Trade',
-      description: 'Execute trades instantly',
-      icon: <LightningBoltIcon className="w-5 h-5" />,
       color: 'from-yellow-500 to-yellow-600',
       hoverEffect: { y: -5, boxShadow: '0 10px 15px -3px rgba(245, 158, 11, 0.3)' },
     },
@@ -65,7 +67,7 @@ export default function QuickActions() {
         transition={{ delay: 0.5 }}
       >
         {actions.map((action, index) => (
-          <motion.button
+          <motion.div
             key={index}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -74,8 +76,11 @@ export default function QuickActions() {
             whileTap={{ scale: 0.98 }}
             onHoverStart={() => setActiveAction(index)}
             onHoverEnd={() => setActiveAction(null)}
-            className="w-full flex items-center space-x-3 p-4 rounded-lg border border-navy-700 bg-navy-900/30 hover:border-navy-600 transition-all duration-300 text-left relative overflow-hidden"
+            className="w-full flex items-center space-x-3 p-4 rounded-lg border border-navy-700 bg-navy-900/30 hover:border-navy-600 transition-all duration-300 text-left relative overflow-hidden cursor-pointer"
           >
+            {action.link ? (
+              <Link href={action.link} className="absolute inset-0 z-10" aria-label={action.title} />
+            ) : null}
             {/* Background gradient that appears on hover */}
             <motion.div 
               className={`absolute inset-0 bg-gradient-to-r ${action.color} opacity-0`}
@@ -106,7 +111,7 @@ export default function QuickActions() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </motion.div>
-          </motion.button>
+          </motion.div>
         ))}
       </motion.div>
     </motion.div>

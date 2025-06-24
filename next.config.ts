@@ -24,6 +24,15 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  redirects: async () => {
+    return [
+      {
+        source: '/deposit',
+        destination: '/dashboard/wallet',
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;
